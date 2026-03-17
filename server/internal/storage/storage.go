@@ -680,6 +680,24 @@ func (d *DB) GetHotFiles(projectPath string, minCount, limit int) ([]FileAccess,
 	return results, rows.Err()
 }
 
+// GetFileAccessCount returns the read_count for a specific file in the given project.
+// Returns 0 if the file has not been accessed yet.
+func (d *DB) GetFileAccessCount(projectPath, filePath string) (int, error) {
+	var count int
+	err := d.db.QueryRow(
+		`SELECT read_count FROM file_access WHERE project_path = ? AND file_path = ?`,
+		projectPath, filePath,
+	).Scan(&count)
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	if err != nil {
+		d.log.Error(fmt.Sprintf("GetFileAccessCount: %v", err))
+		return 0, fmt.Errorf("get file access count: %w", err)
+	}
+	return count, nil
+}
+
 // GetFileAccess returns the access record for a specific file, or nil if not found.
 func (d *DB) GetFileAccess(projectPath, filePath string) (*FileAccess, error) {
 	row := d.db.QueryRow(`SELECT id, project_path, file_path, read_count, edit_count, last_seen

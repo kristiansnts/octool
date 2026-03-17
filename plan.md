@@ -2,9 +2,11 @@
 
 ## Target Platform
 
-**GitHub Copilot CLI ONLY.** NOT for Claude Code (different hook system entirely).
+**GitHub Copilot CLI + Claude Code.** Both platforms supported via adapter layer. Same Go binary, same arms, same DB.
 
 Copilot CLI hooks: `.github/hooks/*.json` with `sessionStart`, `sessionEnd`, `userPromptSubmitted`, `preToolUse`, `postToolUse`, `errorOccurred` — receive JSON via stdin, return JSON via stdout.
+
+Claude Code hooks: `.claude/settings.json` with `PreToolUse`, `PostToolUse`, `Stop`, `Notification` — receive JSON via stdin, print text to stdout (injected as context). Exit code 2 from `PreToolUse` enforces a deny (tool call is blocked).
 
 ---
 
