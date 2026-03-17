@@ -94,6 +94,32 @@ func main() {
 		Use:   "pre-check",
 		Short: "Pre-tool-use check",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			db, err := storage.Open()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			tool := strings.ToLower(preCheckTool)
+			filePath := extractFilePath(preCheckArgs)
+
+			// Block redundant file reads (3+ times this session)
+			if tool == "view" && filePath != "" && preCheckCwd != "" {
+				count, err := db.GetFileAccessCount(preCheckCwd, filePath)
+				if err != nil {
+					// Log but don't block — fail open on DB errors
+					fmt.Fprintf(os.Stderr, "pre-check: GetFileAccessCount: %v\n", err)
+				} else if count >= 3 {
+					printJSON(map[string]string{
+						"permissionDecision":       "deny",
+						"permissionDecisionReason": fmt.Sprintf("File '%s' already read %d times this session. Use cached context instead.", filePath, count),
+						"systemMessage":            "",
+					})
+					return nil
+				}
+			}
+
+			// Allow everything else
 			printJSON(map[string]string{"systemMessage": ""})
 			return nil
 		},
@@ -384,6 +410,215 @@ func main() {
 	}
 	setupCmd.Flags().StringVar(&setupCwd, "cwd", "", "Project directory (default: current dir)")
 
+	// setup-claude --cwd PATH  (creates .claude/settings.json)
+	var setupClaudeCwd string
+	setupClaudeCmd := &cobra.Command{
+		Use:   "setup-claude",
+		Short: "Install octool hooks into Claude Code (.claude/settings.json)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cwd := setupClaudeCwd
+			if cwd == "" {
+				var err error
+				cwd, err = os.Getwd()
+				if err != nil {
+					return err
+				}
+			}
+
+			// Resolve adapter hooks directory: ~/.octool/adapters/claude-code/hooks/
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return err
+			}
+			hooksDir := filepath.Join(home, ".octool", "adapters", "claude-code", "hooks")
+
+			// Walk up to find git root, fall back to cwd
+			gitRoot := cwd
+			for dir := cwd; dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+				if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+					gitRoot = dir
+					break
+				}
+			}
+
+			claudeDir := filepath.Join(gitRoot, ".claude")
+			if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+				return fmt.Errorf("create .claude dir: %w", err)
+			}
+
+			settingsJSON := fmt.Sprintf(`{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "%s/pre-tool-use.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "%s/post-tool-use.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "%s/stop.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "%s/notification.sh"
+          }
+        ]
+      }
+    ]
+  }
+}`, hooksDir, hooksDir, hooksDir, hooksDir)
+
+			outPath := filepath.Join(claudeDir, "settings.json")
+			if err := os.WriteFile(outPath, []byte(settingsJSON), 0o644); err != nil {
+				return fmt.Errorf("write settings file: %w", err)
+			}
+
+			printJSON(map[string]any{"ok": true, "path": outPath})
+			return nil
+		},
+	}
+	setupClaudeCmd.Flags().StringVar(&setupClaudeCwd, "cwd", "", "Project directory (default: current dir)")
+
+	// generate-claude-md --cwd PATH  (writes/updates CLAUDE.md from DB context)
+	var generateClaudeMdCwd string
+	generateClaudeMdCmd := &cobra.Command{
+		Use:   "generate-claude-md",
+		Short: "Generate or update CLAUDE.md from stored context entries",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cwd := generateClaudeMdCwd
+			if cwd == "" {
+				var err error
+				cwd, err = os.Getwd()
+				if err != nil {
+					return err
+				}
+			}
+
+			db, err := storage.Open()
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
+			// Walk up to find git root, fall back to cwd
+			gitRoot := cwd
+			for dir := cwd; dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+				if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+					gitRoot = dir
+					break
+				}
+			}
+
+			conventions, err := db.GetContextEntries(cwd, "convention")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "generate-claude-md: GetContextEntries(convention): %v\n", err)
+			}
+			fileMaps, err := db.GetContextEntries(cwd, "file-map")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "generate-claude-md: GetContextEntries(file-map): %v\n", err)
+			}
+			recent, err := db.GetRecentSessionMetrics(cwd, 1)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "generate-claude-md: GetRecentSessionMetrics: %v\n", err)
+			}
+
+			var conventionsSection string
+			if len(conventions) == 0 {
+				conventionsSection = "_No conventions stored yet. Run `octool save --type convention` to add some._"
+			} else {
+				for _, e := range conventions {
+					conventionsSection += fmt.Sprintf("### %s\n\n%s\n\n", e.Title, e.Content)
+				}
+			}
+
+			var fileMapsSection string
+			if len(fileMaps) == 0 {
+				fileMapsSection = "_No file map stored yet. Run `octool finalize` at the end of a session to auto-generate._"
+			} else {
+				for _, e := range fileMaps {
+					fileMapsSection += fmt.Sprintf("### %s\n\n%s\n\n", e.Title, e.Content)
+				}
+			}
+
+			var sessionSection string
+			if len(recent) == 0 {
+				sessionSection = "_No previous session data available yet._"
+			} else {
+				m := recent[0]
+				sessionSection = fmt.Sprintf(
+					"Last session: %s — %d tool calls (%d views, %d edits, %d bash)",
+					m.CreatedAt.Format("2006-01-02 15:04"),
+					m.TotalTools, m.TotalViews, m.TotalEdits, m.TotalBash,
+				)
+			}
+
+			content := fmt.Sprintf(`# CLAUDE.md — OcTool Context for Claude Code
+
+This file is auto-generated by OcTool. It provides Claude Code with project
+context carried over from previous sessions.
+
+## Project Conventions
+
+<!-- octool:conventions -->
+%s
+<!-- /octool:conventions -->
+
+## File Map
+
+<!-- octool:file-map -->
+%s
+<!-- /octool:file-map -->
+
+## Previous Session Summary
+
+<!-- octool:session-summary -->
+%s
+<!-- /octool:session-summary -->
+
+---
+
+> **Note**: Regenerate this file with `+"`"+`octool generate-claude-md`+"`"+` to refresh context
+> from the OcTool database.
+`, conventionsSection, fileMapsSection, sessionSection)
+
+			outPath := filepath.Join(gitRoot, "CLAUDE.md")
+			if err := os.WriteFile(outPath, []byte(content), 0o644); err != nil {
+				return fmt.Errorf("write CLAUDE.md: %w", err)
+			}
+
+			printJSON(map[string]any{"ok": true, "path": outPath})
+			return nil
+		},
+	}
+	generateClaudeMdCmd.Flags().StringVar(&generateClaudeMdCwd, "cwd", "", "Project directory (default: current dir)")
+
 	// version
 	versionCmd := &cobra.Command{
 		Use:   "version",
@@ -408,6 +643,8 @@ func main() {
 		deleteCmd,
 		serveCmd,
 		setupCmd,
+		setupClaudeCmd,
+		generateClaudeMdCmd,
 		versionCmd,
 	)
 

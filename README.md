@@ -1,6 +1,6 @@
 # OcTool
 
-Prompt efficiency layer for Copilot CLI. OcTool runs as a plugin that hooks into every session, auto-injecting context from previous sessions, coaching prompt quality, and helping the agent succeed on the first try — so you send fewer follow-up messages and use fewer premium requests.
+Prompt efficiency layer for Copilot CLI and Claude Code. OcTool runs as a plugin that hooks into every session, auto-injecting context from previous sessions, coaching prompt quality, and helping the agent succeed on the first try — so you send fewer follow-up messages and use fewer premium requests.
 
 ## How it works
 
@@ -33,21 +33,70 @@ OcTool reduces the number of follow-up prompts you need to send:
 
 ## Installation
 
-### 1. Install via marketplace
+### GitHub Copilot CLI
+
+#### 1. Install via marketplace
 
 ```bash
 copilot plugin install octool
 ```
 
-### 2. Enable the plugin
+#### 2. Enable the plugin
 
 ```bash
 copilot plugin enable octool
 ```
 
-### 3. Restart your Copilot CLI session
+#### 3. Restart your Copilot CLI session
 
 The plugin hooks activate automatically on the next session start.
+
+---
+
+### Claude Code
+
+#### 1. Install the binary
+
+```bash
+# Build from source (requires Go 1.21+)
+cd octool/server
+go build -o ~/.octool/bin/octool ./cmd/octool/
+```
+
+#### 2. Copy the adapter scripts
+
+```bash
+mkdir -p ~/.octool/adapters/claude-code/hooks
+cp adapters/claude-code/hooks/* ~/.octool/adapters/claude-code/hooks/
+chmod +x ~/.octool/adapters/claude-code/hooks/*.sh
+```
+
+#### 3. Install hooks into your project
+
+```bash
+octool setup-claude --cwd /path/to/your/project
+```
+
+This creates `.claude/settings.json` wiring OcTool into Claude Code's hook system.
+
+#### 4. Generate CLAUDE.md
+
+```bash
+octool generate-claude-md --cwd /path/to/your/project
+```
+
+This writes a `CLAUDE.md` to your project root with conventions, file maps, and session
+history from the OcTool database. Claude Code reads this file automatically.
+
+#### How `exit 2` enforcement works
+
+Unlike Copilot CLI (where `permissionDecision: "deny"` is advisory), Claude Code
+**enforces** a deny when the `PreToolUse` hook exits with code 2. The tool call
+never runs. OcTool uses this to block redundant file reads that have already been
+read 3+ times this session, saving context window tokens and keeping the agent focused.
+
+The same SQLite database (`~/.octool/octool.db`) and dashboard (`octool serve`)
+work across both Copilot CLI and Claude Code sessions.
 
 ---
 
@@ -106,17 +155,20 @@ Then open [http://localhost:37888](http://localhost:37888) in your browser.
 octool [command]
 
 Commands:
-  inject         Inject context at session start (fires Arms 3 & 7)
-  track          Record a tool call and run post-tool-use arms (Arms 2, 6, 8)
-  prompt-check   Analyze a user prompt (fires Arms 4 & 5)
-  finalize       Run session-end arms and save metrics (Arm 1)
-  entries        List stored context entries
-  save           Save a context entry manually
-  delete         Delete a context entry by ID
-  fetch-session  Import session logs from Copilot CLI history
-  status         Show current session token efficiency metrics
-  serve          Start the dashboard HTTP server
-  version        Print version
+  inject              Inject context at session start (fires Arms 3 & 7)
+  track               Record a tool call and run post-tool-use arms (Arms 2, 6, 8)
+  prompt-check        Analyze a user prompt (fires Arms 4 & 5)
+  finalize            Run session-end arms and save metrics (Arm 1)
+  entries             List stored context entries
+  save                Save a context entry manually
+  delete              Delete a context entry by ID
+  fetch-session       Import session logs from Copilot CLI history
+  status              Show current session token efficiency metrics
+  serve               Start the dashboard HTTP server
+  setup               Install octool hooks into .github/hooks/ (Copilot CLI)
+  setup-claude        Install octool hooks into .claude/settings.json (Claude Code)
+  generate-claude-md  Generate or update CLAUDE.md from stored context entries
+  version             Print version
 ```
 
 ---
