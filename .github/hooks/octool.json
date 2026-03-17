@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [{"type":"command","bash":"/Users/rpay/.octool/scripts/session-start.sh","cwd":".","timeoutSec":10}],
+    "sessionEnd":   [{"type":"command","bash":"/Users/rpay/.octool/scripts/session-end.sh","cwd":".","timeoutSec":15}],
+    "userPromptSubmitted": [{"type":"command","bash":"/Users/rpay/.octool/scripts/user-prompt.sh","cwd":".","timeoutSec":5}],
+    "preToolUse":   [{"type":"command","bash":"/Users/rpay/.octool/scripts/pre-tool-use.sh","cwd":".","timeoutSec":3}],
+    "postToolUse":  [{"type":"command","bash":"/Users/rpay/.octool/scripts/post-tool-use.sh","cwd":".","timeoutSec":3}],
+    "errorOccurred":[{"type":"command","bash":"/Users/rpay/.octool/scripts/error-occurred.sh","cwd":".","timeoutSec":3}]
+  }
+}

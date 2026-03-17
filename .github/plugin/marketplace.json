@@ -1,0 +1,19 @@
+{
+  "name": "kristiansnts-octool",
+  "owner": {
+    "name": "kristiansnts",
+    "email": "kristiansnts@users.noreply.github.com"
+  },
+  "metadata": {
+    "description": "Automated token efficiency layer for Copilot CLI — the octopus brain that reduces wasted tool calls",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "octool",
+      "description": "Tracks token waste patterns and auto-injects the right context to reduce redundant file reads, build cycles, and rework",
+      "version": "0.1.0",
+      "source": "./plugins/octool"
+    }
+  ]
+}

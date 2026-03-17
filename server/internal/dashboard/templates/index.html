@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OcTool Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#f5f5f5;color:#222;font-size:14px}
+header{background:#1a1a2e;color:#eee;padding:12px 20px;display:flex;align-items:center;gap:16px}
+header h1{font-size:18px;font-weight:600}
+#status-bar{font-size:12px;color:#aaa;margin-left:auto;display:flex;gap:16px}
+#status-bar span{white-space:nowrap}
+nav{background:#16213e;display:flex;gap:0;overflow-x:auto}
+nav button{background:none;border:none;color:#aaa;padding:10px 18px;cursor:pointer;font-size:13px;white-space:nowrap;border-bottom:2px solid transparent}
+nav button.active{color:#fff;border-bottom-color:#e94560}
+nav button:hover{color:#fff}
+/* Logs tab */
+.log-toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.log-toolbar select,.log-toolbar input{padding:5px 9px;border:1px solid #ccc;border-radius:4px;font-size:12px;background:#fff}
+#log-output{background:#1a1a2e;color:#c8d3f0;font-family:monospace;font-size:12px;line-height:1.55;padding:12px 14px;border-radius:6px;overflow-y:auto;max-height:calc(100vh - 180px);white-space:pre-wrap;word-break:break-all}
+.log-sep{color:#555;user-select:none}
+.log-hook{color:#e94560}
+.log-arm{color:#f9a825}
+.log-info{color:#7ec8e3}
+.log-err{color:#ff5252}
+.log-ok{color:#69f0ae}
+.tab{display:none;padding:16px}
+.tab.active{display:block}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+th{background:#eee;text-align:left;padding:8px 10px;font-weight:600;font-size:12px;text-transform:uppercase;color:#555}
+td{padding:7px 10px;border-top:1px solid #f0f0f0;vertical-align:top;word-break:break-word}
+tr:hover td{background:#f9f9f9}
+.filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filters input,.filters select{padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;background:#fff}
+.filters button,.btn{padding:6px 14px;border:none;border-radius:4px;cursor:pointer;font-size:13px;background:#e94560;color:#fff}
+.filters button:hover,.btn:hover{background:#c73350}
+.del-btn{background:#dc3545;color:#fff;border:none;border-radius:3px;padding:3px 6px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center}
+.del-btn:hover{background:#a71d2a}
+.view-btn{background:#1a1a2e;color:#eee;border:none;border-radius:3px;padding:3px 6px;cursor:pointer;font-size:12px;display:inline-flex;align-items:center;justify-content:center;margin-right:4px}
+.view-btn:hover{background:#e94560;color:#fff}
+.action-btns{display:flex;gap:4px;white-space:nowrap}
+/* Modal */
+#entry-modal{display:none;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center}
+#entry-modal.open{display:flex}
+#modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(2px)}
+#modal-box{position:relative;z-index:1;background:#fff;border-radius:8px;width:min(600px,92vw);max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+#modal-header{background:#1a1a2e;color:#eee;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#modal-header h2{font-size:15px;font-weight:600;letter-spacing:.3px}
+#modal-close{background:none;border:none;color:#aaa;cursor:pointer;padding:2px;line-height:0;border-radius:3px}
+#modal-close:hover{color:#fff;background:#e94560}
+#modal-body{padding:18px;overflow-y:auto;flex:1}
+.modal-field{margin-bottom:14px}
+.modal-label{font-size:11px;font-weight:600;text-transform:uppercase;color:#888;letter-spacing:.6px;margin-bottom:4px}
+.modal-value{font-size:13px;color:#222;line-height:1.6;word-break:break-word}
+.modal-value.mono{font-family:monospace;background:#f5f5f5;padding:8px 10px;border-radius:4px;border-left:3px solid #e94560;white-space:pre-wrap}
+.type-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;letter-spacing:.3px}
+.type-badge.file-map{background:#dbeafe;color:#1d4ed8}
+.type-badge.convention{background:#dcfce7;color:#15803d}
+.type-badge.gotcha{background:#fef3c7;color:#92400e}
+.type-badge.schema{background:#ede9fe;color:#6d28d9}
+.type-badge.api-catalog{background:#fce7f3;color:#9d174d}
+.info-box{background:#fff;border-radius:4px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.1);margin-bottom:12px}
+.info-box p{margin:4px 0;line-height:1.6}
+.arm-tag{display:inline-block;background:#1a1a2e;color:#eee;padding:1px 6px;border-radius:10px;font-size:11px}
+code{background:#eee;padding:1px 5px;border-radius:3px;font-size:12px}
+.empty{color:#999;padding:20px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>OcTool Dashboard</h1>
+  <div id="status-bar">
+    <span id="s-db">db: —</span>
+    <span id="s-entries">entries: —</span>
+    <span id="s-sessions">sessions: —</span>
+    <span id="s-arms">arms: —</span>
+  </div>
+</header>
+<nav>
+  <button class="active" onclick="showTab('token-waste',this)">Token Waste</button>
+  <button onclick="showTab('context-entries',this)">Context Entries</button>
+  <button onclick="showTab('arm-activity',this)">Arm Activity</button>
+  <button onclick="showTab('hot-files',this)">Hot Files</button>
+  <button onclick="showTab('logs',this)">Logs</button>
+  <button onclick="showTab('import-sessions',this)">Import Sessions</button>
+  <button onclick="showTab('help',this)">Help</button>
+</nav>
+
+<!-- Entry Detail Modal -->
+<div id="entry-modal">
+  <div id="modal-backdrop" onclick="closeModal()"></div>
+  <div id="modal-box">
+    <div id="modal-header">
+      <h2>Entry Details</h2>
+      <button id="modal-close" onclick="closeModal()" title="Close">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<!-- Token Waste -->
+<div id="token-waste" class="tab active">
+  <table id="sessions-table">
+    <thead><tr>
+      <th>Project</th><th>Date</th><th>View:Edit</th>
+      <th>Waste Tokens</th><th>Build Cycles</th><th>Prompts</th>
+    </tr></thead>
+    <tbody id="sessions-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Context Entries -->
+<div id="context-entries" class="tab">
+  <div class="filters">
+    <select id="f-project" onchange="loadEntries()">
+      <option value="">All projects</option>
+    </select>
+    <select id="f-type" onchange="loadEntries()">
+      <option value="">All types</option>
+      <option value="file-map">file-map</option>
+      <option value="convention">convention</option>
+      <option value="gotcha">gotcha</option>
+      <option value="schema">schema</option>
+      <option value="api-catalog">api-catalog</option>
+    </select>
+  </div>
+  <table id="entries-table">
+    <thead><tr>
+      <th>ID</th><th>Project</th><th>Type</th><th>Title</th>
+      <th>Source</th><th>Priority</th><th></th>
+    </tr></thead>
+    <tbody id="entries-body"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Arm Activity -->
+<div id="arm-activity" class="tab">
+  <table id="arm-table">
+    <thead><tr>
+      <th>Timestamp</th><th>Arm</th><th>Action</th><th>Detail</th><th>Project</th>
+    </tr></thead>
+    <tbody id="arm-body"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Hot Files -->
+<div id="hot-files" class="tab">
+  <div class="filters">
+    <select id="hf-project" onchange="loadHotFiles()">
+      <option value="">All projects</option>
+    </select>
+  </div>
+  <table id="hf-table">
+    <thead><tr>
+      <th>File</th><th>Project</th><th>Reads</th><th>Edits</th><th>Total</th><th>Last Seen</th>
+    </tr></thead>
+    <tbody id="hf-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Logs -->
+<div id="logs" class="tab">
+  <div class="log-toolbar">
+    <select id="log-file" onchange="loadLogs()">
+      <option value="">Hooks + Arm Activity</option>
+      <option value="hooks">Hooks only</option>
+      <option value="arm">Arm Activity only</option>
+      <option value="octool">Main log</option>
+    </select>
+    <input type="number" id="log-lines" value="200" min="50" max="2000" style="width:80px" onchange="loadLogs()" title="Max lines">
+    <button class="btn" onclick="loadLogs()">↺ Refresh</button>
+    <label style="margin-left:auto;font-size:12px;color:#888">
+      <input type="checkbox" id="log-autoscroll" checked> Auto-scroll
+    </label>
+  </div>
+  <div id="log-output"><span style="color:#555">Loading…</span></div>
+</div>
+
+<!-- Import Sessions -->
+<div id="import-sessions" class="tab">
+  <div class="info-box">
+    <p><strong>Import Session History</strong></p>
+    <p>Use <code>octool fetch-session</code> from the CLI to import session history.</p>
+    <p>Options: <code>--limit N</code>, <code>--all</code>, <code>--project PATH</code>, <code>--dry-run</code></p>
+  </div>
+</div>
+
+<!-- Help -->
+<div id="help" class="tab">
+  <div class="info-box">
+    <p><strong>OcTool — 8 Arms</strong></p>
+    <p style="margin-top:8px">OcTool monitors your Copilot CLI sessions and fires one of 8 arms when it detects inefficiency:</p>
+    <table style="margin-top:10px;width:auto">
+      <thead><tr><th>Arm</th><th>Triggers when…</th><th>Threshold</th></tr></thead>
+      <tbody>
+        <tr><td><span class="arm-tag">redundant-read</span></td><td>Same file read multiple times</td><td>≥ 3 reads of same file</td></tr>
+        <tr><td><span class="arm-tag">build-loop</span></td><td>Repeated build/test failures</td><td>≥ 3 build cycles</td></tr>
+        <tr><td><span class="arm-tag">stale-context</span></td><td>Injected context is outdated</td><td>staleness_risk = high</td></tr>
+        <tr><td><span class="arm-tag">token-waste</span></td><td>High estimated waste tokens</td><td>≥ 2000 waste tokens</td></tr>
+        <tr><td><span class="arm-tag">low-edit-ratio</span></td><td>Too many views vs edits</td><td>view:edit ratio > 10</td></tr>
+        <tr><td><span class="arm-tag">still-followup</span></td><td>Unresolved "still" prompts</td><td>≥ 2 still followups</td></tr>
+        <tr><td><span class="arm-tag">vague-prompt</span></td><td>Prompt lacks specificity</td><td>prompt_high ≥ 2</td></tr>
+        <tr><td><span class="arm-tag">context-drift</span></td><td>Session drifting from goal</td><td>session entropy spike</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:12px">The dashboard auto-refreshes the status bar every 30 seconds.</p>
+  </div>
+</div>
+
+<script>
+function showTab(id, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'token-waste') loadSessions();
+  if (id === 'context-entries') { loadProjects(); loadEntries(); }
+  if (id === 'arm-activity') loadArmActivity();
+  if (id === 'hot-files') { loadHotFilesProjects(); loadHotFiles(); }
+  if (id === 'logs') loadLogs();
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleString(); } catch(e) { return s; }
+}
+
+function loadStatus() {
+  fetch('/api/status').then(r => r.json()).then(d => {
+    document.getElementById('s-db').textContent = 'db: ' + (d.db || '—');
+    document.getElementById('s-entries').textContent = 'entries: ' + (d.entries ?? '—');
+    document.getElementById('s-sessions').textContent = 'sessions: ' + (d.sessions ?? '—');
+    document.getElementById('s-arms').textContent = 'arms: ' + (d.arms ?? '—');
+  }).catch(() => {});
+}
+
+function loadSessions() {
+  fetch('/api/sessions?limit=50').then(r => r.json()).then(rows => {
+    const tb = document.getElementById('sessions-body');
+    if (!rows || rows.length === 0) {
+      tb.innerHTML = '<tr><td colspan="6" class="empty">No sessions found. Run <code>octool fetch-session</code>.</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(s => `<tr>
+      <td>${esc(s.ProjectPath||'')}</td>
+      <td>${fmtDate(s.CreatedAt)}</td>
+      <td>${(s.ViewEditRatio||0).toFixed(2)}</td>
+      <td>${s.EstimatedWasteTokens||0}</td>
+      <td>${s.BuildCycles||0}</td>
+      <td>${s.PromptCount||0}</td>
+    </tr>`).join('');
+  }).catch(() => {
+    document.getElementById('sessions-body').innerHTML = '<tr><td colspan="6" class="empty">Error loading sessions.</td></tr>';
+  });
+}
+
+function shortPath(p) {
+  if (!p) return '—';
+  const parts = p.replace(/\\/g,'/').split('/').filter(Boolean);
+  return parts.length > 1 ? parts[parts.length-2]+'/'+parts[parts.length-1] : parts[0] || p;
+}
+
+function loadProjects() {
+  fetch('/api/projects').then(r => r.json()).then(projects => {
+    const sel = document.getElementById('f-project');
+    const cur = sel.value;
+    // keep first "All projects" option, replace rest
+    while (sel.options.length > 1) sel.remove(1);
+    (projects || []).sort().forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = shortPath(p);
+      opt.title = p;
+      sel.appendChild(opt);
+    });
+    if (cur) sel.value = cur;
+  }).catch(() => {});
+}
+
+function loadEntries() {
+  const p = document.getElementById('f-project').value;
+  const t = document.getElementById('f-type').value;
+  const url = '/api/entries?' + new URLSearchParams({project:p,type:t});
+  fetch(url).then(r => r.json()).then(rows => {
+    const tb = document.getElementById('entries-body');
+    if (!rows || rows.length === 0) {
+      tb.innerHTML = '<tr><td colspan="7" class="empty">No entries found.</td></tr>';
+      return;
+    }
+    // Store entries for modal access
+    window._entries = rows;
+    tb.innerHTML = rows.map(e => `<tr>
+      <td>${e.ID||''}</td>
+      <td title="${esc(e.ProjectPath||'')}">${esc(shortPath(e.ProjectPath))}</td>
+      <td>${esc(e.Type||'')}</td>
+      <td>${esc(e.Title||'')}</td>
+      <td>${esc(e.Source||'')}</td>
+      <td>${esc(e.Priority||'')}</td>
+      <td><div class="action-btns">
+        <button class="view-btn" onclick="viewEntry(${e.ID})" title="View details">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="8" rx="7" ry="4.5" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>
+        </button>
+        <button class="del-btn" onclick="deleteEntry(${e.ID})" title="Delete">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V2.5h4V4M5 4l.5 9.5h5L11 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div></td>
+    </tr>`).join('');
+  }).catch(() => {
+    document.getElementById('entries-body').innerHTML = '<tr><td colspan="7" class="empty">Error loading entries.</td></tr>';
+  });
+}
+
+function deleteEntry(id) {
+  if (!confirm('Delete entry ' + id + '?')) return;
+  fetch('/api/entries/' + id, {method:'DELETE'}).then(r => r.json()).then(d => {
+    if (d.ok) loadEntries();
+    else alert('Delete failed: ' + (d.error || 'unknown error'));
+  }).catch(() => alert('Delete request failed.'));
+}
+
+function loadArmActivity() {
+  fetch('/api/arm-activity?limit=100').then(r => r.json()).then(rows => {
+    const tb = document.getElementById('arm-body');
+    if (!rows || rows.length === 0) {
+      tb.innerHTML = '<tr><td colspan="5" class="empty">No arm activity recorded.</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(a => `<tr>
+      <td>${fmtDate(a.CreatedAt)}</td>
+      <td><span class="arm-tag">${esc(a.Arm||'')}</span></td>
+      <td>${esc(a.Action||'')}</td>
+      <td>${esc(a.Detail||'')}</td>
+      <td>${esc(a.ProjectPath||'')}</td>
+    </tr>`).join('');
+  }).catch(() => {
+    document.getElementById('arm-body').innerHTML = '<tr><td colspan="5" class="empty">Error loading arm activity.</td></tr>';
+  });
+}
+
+function viewEntry(id) {
+  const e = (window._entries || []).find(x => x.ID === id);
+  if (!e) return;
+  const typeClass = (e.Type||'').replace(/[^a-z-]/g,'');
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-field"><div class="modal-label">ID</div><div class="modal-value">${e.ID}</div></div>
+    <div class="modal-field"><div class="modal-label">Type</div><div class="modal-value"><span class="type-badge ${esc(typeClass)}">${esc(e.Type||'—')}</span></div></div>
+    <div class="modal-field"><div class="modal-label">Title</div><div class="modal-value">${esc(e.Title||'—')}</div></div>
+    <div class="modal-field"><div class="modal-label">Content</div><div class="modal-value mono">${esc(e.Content||'—')}</div></div>
+    <div class="modal-field"><div class="modal-label">Project</div><div class="modal-value mono">${esc(e.ProjectPath||'—')}</div></div>
+    <div class="modal-field" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><div class="modal-label">Source</div><div class="modal-value">${esc(e.Source||'—')}</div></div>
+      <div><div class="modal-label">Priority</div><div class="modal-value">${esc(e.Priority||'—')}</div></div>
+    </div>
+    <div class="modal-field" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div><div class="modal-label">Created</div><div class="modal-value">${fmtDate(e.CreatedAt)}</div></div>
+      <div><div class="modal-label">Updated</div><div class="modal-value">${fmtDate(e.UpdatedAt)}</div></div>
+    </div>`;
+  document.getElementById('entry-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('entry-modal').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function loadHotFilesProjects() {
+  fetch('/api/projects').then(r => r.json()).then(projects => {
+    const sel = document.getElementById('hf-project');
+    const cur = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    (projects || []).sort().forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p; opt.textContent = shortPath(p); opt.title = p;
+      sel.appendChild(opt);
+    });
+    if (cur) sel.value = cur;
+  }).catch(() => {});
+}
+
+function loadHotFiles() {
+  const p = document.getElementById('hf-project').value;
+  const url = '/api/hot-files?' + new URLSearchParams({project: p, limit: 100});
+  fetch(url).then(r => r.json()).then(rows => {
+    const tb = document.getElementById('hf-body');
+    if (!rows || rows.length === 0) {
+      tb.innerHTML = '<tr><td colspan="6" class="empty">No file access data yet. Files are tracked as you view/edit them.</td></tr>';
+      return;
+    }
+    tb.innerHTML = rows.map(f => {
+      const total = (f.ReadCount||0) + (f.EditCount||0);
+      const heat = total >= 10 ? 'color:#e94560;font-weight:600' : total >= 5 ? 'color:#f9a825' : '';
+      return `<tr>
+        <td style="${heat}" title="${esc(f.FilePath)}">${esc(shortPath(f.FilePath))}</td>
+        <td title="${esc(f.ProjectPath)}">${esc(shortPath(f.ProjectPath))}</td>
+        <td>${f.ReadCount||0}</td>
+        <td>${f.EditCount||0}</td>
+        <td style="${heat}">${total}</td>
+        <td>${fmtDate(f.LastSeen)}</td>
+      </tr>`;
+    }).join('');
+  }).catch(() => {
+    document.getElementById('hf-body').innerHTML = '<tr><td colspan="6" class="empty">Error loading hot files.</td></tr>';
+  });
+}
+
+function loadLogs() {
+  const file = document.getElementById('log-file').value;
+  const lines = document.getElementById('log-lines').value || 200;
+  const params = new URLSearchParams({lines});
+  if (file) params.set('file', file);
+  fetch('/api/logs?' + params).then(r => r.json()).then(rows => {
+    const out = document.getElementById('log-output');
+    if (!rows || rows.length === 0) {
+      out.innerHTML = '<span style="color:#555">No log entries found for today yet.</span>';
+      return;
+    }
+    out.innerHTML = rows.map(l => colorize(l)).join('\n');
+    if (document.getElementById('log-autoscroll').checked) {
+      out.scrollTop = out.scrollHeight;
+    }
+  }).catch(() => {
+    document.getElementById('log-output').innerHTML = '<span class="log-err">Error loading logs.</span>';
+  });
+}
+
+function colorize(l) {
+  const s = esc(l.raw);
+  // Section separators (━━━)
+  if (s.includes('━━━')) return '<span class="log-sep">' + s + '</span>';
+  // ARM entries
+  if (s.includes('[ARM]')) return '<span class="log-arm">' + s + '</span>';
+  // HOOK entries
+  if (s.includes('[HOOK]')) {
+    if (s.includes('status=ok') || s.includes('status=tracked') || s.includes('status=finalized')) {
+      return '<span class="log-ok">' + s + '</span>';
+    }
+    if (s.includes('status=coached') || s.includes('status=injected') || s.includes('status=arm_fired')) {
+      return '<span class="log-hook">' + s + '</span>';
+    }
+    return '<span class="log-info">' + s + '</span>';
+  }
+  // Error lines
+  if (s.includes('[ERROR]')) return '<span class="log-err">' + s + '</span>';
+  // Warn lines
+  if (s.includes('[WARN]')) return '<span style="color:#ffb300">' + s + '</span>';
+  return s;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Initial load
+loadStatus();
+loadSessions();
+loadProjects();
+setInterval(loadStatus, 30000);
+</script>
+</body>
+</html>

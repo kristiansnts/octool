@@ -1,0 +1,13 @@
+{
+  "name": "octool",
+  "description": "Automated token efficiency layer — tracks waste patterns, auto-injects context, coaches prompts, and reduces redundant tool calls by 33%",
+  "version": "0.1.0",
+  "author": {
+    "name": "kristiansnts"
+  },
+  "license": "MIT",
+  "keywords": ["token-efficiency", "context", "memory", "octopus", "optimization"],
+  "hooks": "hooks.json",
+  "skills": ["skills/"],
+  "agents": "agents/"
+}
