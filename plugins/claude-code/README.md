@@ -22,10 +22,11 @@ Additionally, OcTool's `PreToolUse` hook exits with code 2 to **enforce** blocki
 
 ## Installation
 
-### 1. Install the plugin
+### 1. Add the marketplace and install the plugin
 
 ```bash
-/plugin install octool@kristiansnts/octool
+/plugin marketplace add kristiansnts/octool
+/plugin install octool
 ```
 
 Or browse for it in `/plugin > Discover`.
