@@ -1,0 +1,20 @@
+{
+  "name": "kristiansnts-octool",
+  "displayName": "OcTool Plugin Marketplace",
+  "owner": {
+    "name": "kristiansnts",
+    "email": "kristiansnts@users.noreply.github.com"
+  },
+  "plugins": [
+    {
+      "name": "octool",
+      "description": "Prompt efficiency layer for Claude Code — hooks into every session to auto-inject context, coach prompt quality, and reduce follow-up messages",
+      "version": "0.1.0",
+      "author": {
+        "name": "kristiansnts"
+      },
+      "source": "./plugins/claude-code",
+      "category": "development"
+    }
+  ]
+}
