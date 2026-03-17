@@ -1,6 +1,6 @@
 # OcTool
 
-Automated token efficiency layer for Copilot CLI. OcTool runs as a plugin that hooks into every session, tracking waste patterns, auto-injecting context, coaching prompts, and reducing redundant tool calls by up to 33%.
+Prompt efficiency layer for Copilot CLI. OcTool runs as a plugin that hooks into every session, auto-injecting context from previous sessions, coaching prompt quality, and helping the agent succeed on the first try — so you send fewer follow-up messages and use fewer premium requests.
 
 ## How it works
 
@@ -12,6 +12,22 @@ OcTool installs as a Copilot CLI plugin and fires 8 autonomous arms across the s
 - **Session end**: auto-generates file maps for future sessions
 
 All state is persisted in a local SQLite database (`~/.octool/octool.db`).
+
+---
+
+## Why OcTool?
+
+GitHub Copilot premium requests are counted **per user message**, not per tool call. When you send one prompt and the agent runs 20 tool calls autonomously, that's still one premium request. The real cost comes from **follow-up prompts** — every time you say "try again", "no I meant...", "look at this file", or "where was I?", that's another premium request.
+
+OcTool reduces the number of follow-up prompts you need to send:
+
+| Without OcTool | With OcTool |
+|---|---|
+| Prompt 1: "refactor auth module" → agent lacks context, reads wrong files | Prompt 1: "refactor auth module" → context already injected, agent knows the codebase |
+| Prompt 2: "no, look at src/auth/..." → guiding the agent | Agent succeeds on first try |
+| Prompt 3: "use our existing patterns" → fixing conventions | ✅ Done — 1 premium request |
+| Prompt 4: "fix the build error" → another follow-up | |
+| ❌ 4 premium requests for one task | |
 
 ---
 
@@ -39,14 +55,14 @@ The plugin hooks activate automatically on the next session start.
 
 | # | Arm | Trigger | Description |
 |---|-----|---------|-------------|
-| 1 | Filemap Generator | Session end | Auto-saves a directory tree snapshot as a context entry for future sessions |
-| 2 | Build Watcher | Post-tool-use | Detects repeated build failures and injects a warning to break the loop |
-| 3 | Recovery Arm | Session start | Re-injects high-value context entries saved from previous sessions |
-| 4 | Convention Enforcer | User prompt | Checks the prompt against stored coding conventions and surfaces conflicts |
-| 5 | Prompt Coach | User prompt | Scores prompt quality and suggests rewrites that consume fewer tokens |
-| 6 | Schema Guard | Post-tool-use | Detects drift between tool arguments and stored schema snapshots |
-| 7 | Resume Advisor | Session start (resume) | Summarizes what was in-progress when the previous session ended |
-| 8 | View:Edit Ratio | Post-tool-use | Warns when the session is reading far more than it is writing |
+| 1 | Filemap Generator | Session end | Auto-saves a directory tree snapshot so the agent already knows your project structure in future sessions — no "look at src/..." follow-ups needed |
+| 2 | Build Watcher | Post-tool-use | Detects repeated build failures and injects a warning to break the loop — helps fix the root cause in one follow-up instead of five |
+| 3 | Recovery Arm | Session start | Re-injects high-value context entries from previous sessions — eliminates "remind me" and "I was working on..." follow-up prompts |
+| 4 | Convention Enforcer | User prompt | Checks the prompt against stored coding conventions — prevents "no, use our coding style" follow-up corrections |
+| 5 | Prompt Coach | User prompt | Scores prompt quality and suggests rewrites that help the agent succeed on the first try |
+| 6 | Schema Guard | Post-tool-use | Detects drift between tool arguments and stored schema snapshots — keeps the agent aligned within the current turn |
+| 7 | Resume Advisor | Session start (resume) | Summarizes what was in-progress when the previous session ended — no "what was I working on?" prompt needed |
+| 8 | View:Edit Ratio | Post-tool-use | Warns when the session is reading far more than writing — surfaces inefficiency so you can course-correct early |
 
 ---
 
