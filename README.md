@@ -1,6 +1,6 @@
 # OcTool
 
-Automated token efficiency layer for Copilot CLI. OcTool runs as a plugin that hooks into every session, tracking waste patterns, auto-injecting context, coaching prompts, and reducing redundant tool calls by up to 33%.
+Automated prompt efficiency layer for Copilot CLI. OcTool runs as a plugin that hooks into every session, auto-injecting context, coaching prompts, and helping the agent succeed on the first try — so you send fewer follow-up messages and use fewer premium requests.
 
 ## How it works
 
@@ -12,6 +12,28 @@ OcTool installs as a Copilot CLI plugin and fires 8 autonomous arms across the s
 - **Session end**: auto-generates file maps for future sessions
 
 All state is persisted in a local SQLite database (`~/.octool/octool.db`).
+
+---
+
+## Why OcTool?
+
+**Premium requests are counted per user message, not per tool call.** When you send one prompt and the agent runs 20 tool calls (views, edits, bash, grep, etc.), that is still 1 premium request. Tool calls within a single turn are free.
+
+The real waste comes from **follow-up prompts**. When the agent doesn't have enough context, a task that should take 1 message ends up taking 3 or 4:
+
+| Without OcTool | With OcTool |
+|---|---|
+| Prompt 1: "refactor auth" → agent reads wrong files | Prompt 1: "refactor auth" → context already injected (file map, conventions, previous decisions) → agent succeeds first try |
+| Prompt 2: "no, I meant src/auth/" → still wrong | |
+| Prompt 3: "look at our conventions" → partially works | |
+| Prompt 4: "fix the build error" → done | |
+| **4 premium requests** | **1 premium request** |
+
+OcTool reduces follow-up prompts by:
+- **Injecting context at session start** so the agent already knows the project structure and previous decisions
+- **Carrying forward file maps and decisions across sessions** so you don't need to re-explain things each time
+- **Coaching prompt quality** so the first prompt is clear enough for the agent to succeed without follow-ups
+- **Resuming sessions without a "where was I?" message** so you never spend a premium request just to re-establish context
 
 ---
 
@@ -39,14 +61,14 @@ The plugin hooks activate automatically on the next session start.
 
 | # | Arm | Trigger | Description |
 |---|-----|---------|-------------|
-| 1 | Filemap Generator | Session end | Auto-saves a directory tree snapshot as a context entry for future sessions |
-| 2 | Build Watcher | Post-tool-use | Detects repeated build failures and injects a warning to break the loop |
-| 3 | Recovery Arm | Session start | Re-injects high-value context entries saved from previous sessions |
-| 4 | Convention Enforcer | User prompt | Checks the prompt against stored coding conventions and surfaces conflicts |
-| 5 | Prompt Coach | User prompt | Scores prompt quality and suggests rewrites that consume fewer tokens |
+| 1 | Filemap Generator | Session end | Auto-saves a directory tree snapshot so the agent already knows project structure next session — no need to send "look at src/..." follow-up prompts |
+| 2 | Build Watcher | Post-tool-use | Detects repeated build failures and coaches you to fix the root cause in one follow-up instead of sending 5 "try again" messages |
+| 3 | Recovery Arm | Session start | Re-injects high-value context from previous sessions so you don't need to send "remind me what we were doing" follow-up prompts |
+| 4 | Convention Enforcer | User prompt | Checks the prompt against stored coding conventions and surfaces conflicts before the agent goes in the wrong direction |
+| 5 | Prompt Coach | User prompt | Scores prompt quality and suggests rewrites that help the agent succeed on the first try, reducing the need for clarifying follow-ups |
 | 6 | Schema Guard | Post-tool-use | Detects drift between tool arguments and stored schema snapshots |
-| 7 | Resume Advisor | Session start (resume) | Summarizes what was in-progress when the previous session ended |
-| 8 | View:Edit Ratio | Post-tool-use | Warns when the session is reading far more than it is writing |
+| 7 | Resume Advisor | Session start (resume) | Summarizes what was in-progress when the previous session ended, eliminating the "what was I working on?" follow-up prompt |
+| 8 | View:Edit Ratio | Post-tool-use | Surfaces when the current turn is struggling so you can give better guidance in fewer follow-ups |
 
 ---
 
