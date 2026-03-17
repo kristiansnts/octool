@@ -1,0 +1,7 @@
+{
+  "name": "octool",
+  "description": "Prompt efficiency layer for Claude Code. OcTool hooks into every session to auto-inject context from previous sessions, coach prompt quality, and help the agent succeed on the first try — reducing follow-up messages and saving quota.",
+  "author": {
+    "name": "kristiansnts"
+  }
+}

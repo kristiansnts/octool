@@ -45,7 +45,9 @@ MSG=$(echo "$OUTPUT"       | jq -r '.systemMessage // ""'             2>/dev/nul
 if [ "$DECISION" = "deny" ]; then
   octool_hook_log "PreToolUse" "status=denied reason=$REASON"
   octool_log INFO "pre-tool-use" "DENIED tool=$CLAUDE_TOOL reason=$REASON"
-  # Print denial reason so Claude can see it; exit 2 enforces the block
+  # Print denial reason so Claude can see it; exit 2 enforces the block.
+  # Disable ERR trap first so this intentional exit doesn't log a spurious error.
+  trap - ERR
   if [ -n "$REASON" ]; then
     echo "$REASON"
   fi

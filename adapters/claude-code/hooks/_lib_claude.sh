@@ -55,7 +55,10 @@ octool_hook_section() {
   printf "\n[%s] ━━━ %s ━━━\n" "$ts" "$hook" >> "$OCTOOL_HOOK_LOG"
 }
 
-# claude_to_copilot_tool: translate Claude Code tool names to Copilot tool names
+# claude_to_copilot_tool: translate Claude Code tool names to Copilot-compatible names.
+# Claude Code tool names sourced from the Claude Code hooks documentation:
+# https://code.claude.com/docs/en/hooks  (tool_name field in PreToolUse/PostToolUse payloads)
+# Last verified: 2025. Add new entries here when Claude Code introduces new built-in tools.
 claude_to_copilot_tool() {
   local claude_tool="$1"
   case "$claude_tool" in
@@ -69,5 +72,7 @@ claude_to_copilot_tool() {
   esac
 }
 
-# Trap errors so they always get logged
+# Trap unexpected errors (non-zero exit codes that are NOT intentional deny exits).
+# Note: hooks that intentionally exit 2 (e.g. pre-tool-use.sh deny path) must call
+# `trap - ERR` before their intentional exit to avoid spurious error log entries.
 trap 'octool_log ERROR "$(basename $0)" "script failed with exit code $?"' ERR
